@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: capim-postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    restart: unless-stopped
+
+  lgtm:
+    image: grafana/otel-lgtm:latest
+    container_name: capim-lgtm
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "3000:3000"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./deploy/grafana/provisioning/datasources/capim-postgres.yaml:/otel-lgtm/grafana/conf/provisioning/datasources/capim-postgres.yaml:ro
+      - ./deploy/grafana/provisioning/dashboards/capim-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/capim-dashboards.yaml:ro
+      - ./deploy/grafana/provisioning/dashboards/capim-api-observability.json:/otel-lgtm/grafana/conf/provisioning/dashboards/capim-api-observability.json:ro
+      - ./deploy/grafana/provisioning/dashboards/capim-business-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/capim-business-dashboards.yaml:ro
+      - ./deploy/grafana/provisioning/dashboards/capim-business-metrics.json:/otel-lgtm/grafana/conf/provisioning/dashboards/capim-business-metrics.json:ro
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: capim-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      lgtm:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      PORT: "${PORT}"
+      DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+      OTEL_ENABLED: "${OTEL_ENABLED}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "${OTEL_EXPORTER_OTLP_PROTOCOL}"
+      OTEL_RESOURCE_ATTRIBUTES: "${OTEL_RESOURCE_ATTRIBUTES}"
+      JWT_SECRET: "${JWT_SECRET}"
+      JWT_ISSUER: "${JWT_ISSUER}"
+      JWT_ACCESS_TOKEN_TTL: "${JWT_ACCESS_TOKEN_TTL}"
+      AUTH_BOOTSTRAP_EMAIL: "${AUTH_BOOTSTRAP_EMAIL}"
+      AUTH_BOOTSTRAP_PASSWORD: "${AUTH_BOOTSTRAP_PASSWORD}"
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

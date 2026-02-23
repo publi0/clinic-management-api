@@ -1,0 +1,24 @@
+meta {
+  name: Delete Dentist
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{base_url}}/api/v1/dentists/{{dentist_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+script:post-response {
+  if (res.getStatus() !== 204) {
+    return;
+  }
+
+  bru.setEnvVar("dentist_id", "");
+}

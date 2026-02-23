@@ -1,0 +1,44 @@
+meta {
+  name: Update Clinic
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{base_url}}/api/v1/clinics/{{clinic_id}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "trade_name": "Odonto Prime Centro",
+    "phone": "+55 11 98888-7777",
+    "bank_accounts": [
+      {
+        "bank_code": "104",
+        "branch_number": "0001",
+        "account_number": "123456-7"
+      }
+    ]
+  }
+}
+
+script:post-response {
+  if (res.getStatus() !== 200) {
+    return;
+  }
+
+  const data = res.getBody();
+  if (!data || !data.id) {
+    return;
+  }
+
+  bru.setEnvVar("clinic_id", data.id);
+}

@@ -1,0 +1,52 @@
+meta {
+  name: Create Clinic
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/v1/clinics
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "tax_id_number": "{{clinic_tax_id}}",
+    "legal_name": "Odonto Prime LTDA",
+    "trade_name": "Odonto Prime",
+    "email": "clinic@example.com",
+    "phone": "+55 11 99999-9999",
+    "bank_accounts": [
+      {
+        "bank_code": "001",
+        "branch_number": "1234",
+        "account_number": "998877"
+      },
+      {
+        "bank_code": "341",
+        "branch_number": "9999",
+        "account_number": "111222"
+      }
+    ]
+  }
+}
+
+script:post-response {
+  if (res.getStatus() !== 201) {
+    return;
+  }
+
+  const data = res.getBody();
+  if (!data || !data.id) {
+    return;
+  }
+
+  bru.setEnvVar("clinic_id", data.id);
+}

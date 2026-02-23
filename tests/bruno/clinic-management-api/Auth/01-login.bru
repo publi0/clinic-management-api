@@ -1,0 +1,37 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v1/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{auth_email}}",
+    "password": "{{auth_password}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() !== 200) {
+    return;
+  }
+
+  const data = res.getBody();
+  if (!data || !data.access_token) {
+    return;
+  }
+
+  // Runtime variable for the current Bruno session (safer than persisting token to disk).
+  bru.setEnvVar("access_token", data.access_token);
+}

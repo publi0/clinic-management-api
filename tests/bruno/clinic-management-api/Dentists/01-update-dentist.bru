@@ -1,0 +1,38 @@
+meta {
+  name: Update Dentist
+  type: http
+  seq: 1
+}
+
+patch {
+  url: {{base_url}}/api/v1/dentists/{{dentist_id}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "legal_name": "Dra. Ana Silva Rocha",
+    "email": "dentist.updated@example.com",
+    "phone": "+55 11 96666-5555"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() !== 200) {
+    return;
+  }
+
+  const data = res.getBody();
+  if (!data || !data.id) {
+    return;
+  }
+
+  bru.setEnvVar("dentist_id", data.id);
+}

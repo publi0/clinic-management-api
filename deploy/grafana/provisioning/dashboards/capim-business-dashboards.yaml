@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: "Capim Business Metrics"
+    orgId: 1
+    folder: "Capim"
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/grafana/conf/provisioning/dashboards/capim-business-metrics.json
+      foldersFromFilesStructure: false

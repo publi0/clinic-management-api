@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: Capim Postgres
+    uid: capim_postgres
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: postgres
+    editable: false
+    jsonData:
+      database: capim_test
+      sslmode: disable
+      postgresVersion: 1700
+      timescaledb: false
+    secureJsonData:
+      password: postgres

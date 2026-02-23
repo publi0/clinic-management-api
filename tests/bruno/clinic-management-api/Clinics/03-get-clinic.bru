@@ -1,0 +1,29 @@
+meta {
+  name: Get Clinic By ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/v1/clinics/{{clinic_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+script:post-response {
+  if (res.getStatus() !== 200) {
+    return;
+  }
+
+  const data = res.getBody();
+  if (!data || !data.id) {
+    return;
+  }
+
+  bru.setEnvVar("clinic_id", data.id);
+}

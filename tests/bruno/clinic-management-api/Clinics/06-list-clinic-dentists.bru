@@ -1,0 +1,31 @@
+meta {
+  name: List Clinic Dentists
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/api/v1/clinics/{{clinic_id}}/dentists?limit=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+script:post-response {
+  if (res.getStatus() !== 200) {
+    return;
+  }
+
+  const data = res.getBody();
+  if (!Array.isArray(data) || data.length === 0) {
+    return;
+  }
+
+  if (data[0] && data[0].id) {
+    bru.setEnvVar("dentist_id", data[0].id);
+  }
+}

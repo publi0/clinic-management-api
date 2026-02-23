@@ -1,0 +1,24 @@
+meta {
+  name: Delete Clinic
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{base_url}}/api/v1/clinics/{{clinic_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+script:post-response {
+  if (res.getStatus() !== 204) {
+    return;
+  }
+
+  bru.setEnvVar("clinic_id", "");
+}

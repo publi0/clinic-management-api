@@ -1,0 +1,41 @@
+meta {
+  name: Create Or Attach Dentist
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/api/v1/clinics/{{clinic_id}}/dentists
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "tax_id_number": "{{dentist_tax_id}}",
+    "legal_name": "Dra. Ana Silva",
+    "email": "dentist@example.com",
+    "phone": "+55 11 97777-6666",
+    "is_admin": true,
+    "is_legal_representative": false
+  }
+}
+
+script:post-response {
+  if (res.getStatus() !== 201) {
+    return;
+  }
+
+  const data = res.getBody();
+  if (!data || !data.id) {
+    return;
+  }
+
+  bru.setEnvVar("dentist_id", data.id);
+}

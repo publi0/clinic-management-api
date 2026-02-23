@@ -1,0 +1,31 @@
+meta {
+  name: List Clinics
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/v1/clinics?limit=20
+  body: none
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+script:post-response {
+  if (res.getStatus() !== 200) {
+    return;
+  }
+
+  const data = res.getBody();
+  if (!Array.isArray(data) || data.length === 0) {
+    return;
+  }
+
+  if (data[0] && data[0].id) {
+    bru.setEnvVar("clinic_id", data[0].id);
+  }
+}

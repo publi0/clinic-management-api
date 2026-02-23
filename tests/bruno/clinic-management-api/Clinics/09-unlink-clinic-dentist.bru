@@ -1,0 +1,27 @@
+meta {
+  name: Unlink Clinic Dentist
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{base_url}}/api/v1/clinics/{{clinic_id}}/dentists/{{dentist_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{access_token}}
+}
+
+script:post-response {
+  if (res.getStatus() !== 204 && res.getStatus() !== 409) {
+    return;
+  }
+
+  if (res.getStatus() === 204) {
+    // Dentist can be recreated/relinked later in the flow.
+    bru.setEnvVar("dentist_id", "");
+  }
+}

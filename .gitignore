@@ -1,0 +1,39 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Env/local secrets
+.env.*
+
+# Go build/test artifacts
+*.test
+*.out
+*.prof
+*.pprof
+coverage.out
+coverage.txt
+cover.out
+dist/
+build/
+tmp/
+
+# Logs
+*.log
+logs/
+
+# Local API/test scratch files
+*.local.json
+*.local.yaml
+*.local.yml
+
+# Hurl reports/artifacts (if generated locally)
+*.hurl.report
+hurl-report/
+
+# Local dot-folders (temporary caches/venvs)
+.gocache/
+.gomodcache/
+.tmp-venv/
