@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -994,13 +995,13 @@ func validateBankAccountInput(input BankAccountInput) error {
 	if strings.TrimSpace(input.AccountNumber) == "" {
 		return fmt.Errorf("account_number is required")
 	}
-	if len(strings.TrimSpace(input.BankCode)) > maxBankFieldLength {
+	if countTrimmedCharacters(input.BankCode) > maxBankFieldLength {
 		return fmt.Errorf("bank_code must be at most %d characters", maxBankFieldLength)
 	}
-	if len(strings.TrimSpace(input.BranchNumber)) > maxBankFieldLength {
+	if countTrimmedCharacters(input.BranchNumber) > maxBankFieldLength {
 		return fmt.Errorf("branch_number must be at most %d characters", maxBankFieldLength)
 	}
-	if len(strings.TrimSpace(input.AccountNumber)) > maxBankFieldLength {
+	if countTrimmedCharacters(input.AccountNumber) > maxBankFieldLength {
 		return fmt.Errorf("account_number must be at most %d characters", maxBankFieldLength)
 	}
 	return nil
@@ -1033,10 +1034,14 @@ func validateOptionalMaxLength(field string, value *string, max int) error {
 }
 
 func validateMaxLength(field string, value string, max int) error {
-	if len(strings.TrimSpace(value)) > max {
+	if countTrimmedCharacters(value) > max {
 		return validationError(fmt.Sprintf("%s must be at most %d characters", field, max))
 	}
 	return nil
+}
+
+func countTrimmedCharacters(value string) int {
+	return utf8.RuneCountInString(strings.TrimSpace(value))
 }
 
 func validateBankAccountsInput(accounts []BankAccountInput) error {
