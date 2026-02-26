@@ -360,12 +360,30 @@ func (s *Service) DeleteClinic(ctx context.Context, clinicID string) error {
 	defer tx.Rollback()
 
 	qtx := s.txQuerier(tx)
+	if err := s.deleteClinicWithinTx(ctx, qtx, clinicID); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) deleteClinicWithinTx(ctx context.Context, qtx repository.Querier, clinicID string) error {
 	clinic, err := qtx.GetClinicByID(ctx, clinicID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return notFoundError("clinic not found")
 		}
 		return err
+	}
+
+	if _, err := qtx.LockClinicForUpdate(ctx, clinicID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return notFoundError("clinic not found")
+		}
+		return mapDatabaseError(err)
 	}
 
 	if _, err := qtx.EndClinicDentistsByClinic(ctx, clinicID); err != nil {
@@ -381,9 +399,6 @@ func (s *Service) DeleteClinic(ctx context.Context, clinicID string) error {
 		return mapDatabaseError(err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
-	}
 	return nil
 }
 

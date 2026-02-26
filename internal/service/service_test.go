@@ -15,8 +15,14 @@ import (
 
 type mockQuerier struct {
 	repository.Querier
-	getUserByEmailFn func(ctx context.Context, email string) (repository.User, error)
-	createUserFn     func(ctx context.Context, arg repository.CreateUserParams) (repository.User, error)
+	getUserByEmailFn             func(ctx context.Context, email string) (repository.User, error)
+	createUserFn                 func(ctx context.Context, arg repository.CreateUserParams) (repository.User, error)
+	getClinicByIDFn              func(ctx context.Context, id string) (repository.Clinic, error)
+	lockClinicForUpdateFn        func(ctx context.Context, id string) (string, error)
+	endClinicDentistsByClinicFn  func(ctx context.Context, clinicID string) (int64, error)
+	deleteBankAccountsByClinicFn func(ctx context.Context, clinicID string) (int64, error)
+	deleteClinicFn               func(ctx context.Context, id string) (int64, error)
+	deletePersonFn               func(ctx context.Context, id string) (int64, error)
 }
 
 func (m mockQuerier) GetUserByEmail(ctx context.Context, email string) (repository.User, error) {
@@ -31,6 +37,48 @@ func (m mockQuerier) CreateUser(ctx context.Context, arg repository.CreateUserPa
 		return m.createUserFn(ctx, arg)
 	}
 	return repository.User{ID: arg.ID, Email: arg.Email, PasswordHash: arg.PasswordHash}, nil
+}
+
+func (m mockQuerier) GetClinicByID(ctx context.Context, id string) (repository.Clinic, error) {
+	if m.getClinicByIDFn != nil {
+		return m.getClinicByIDFn(ctx, id)
+	}
+	return repository.Clinic{}, sql.ErrNoRows
+}
+
+func (m mockQuerier) LockClinicForUpdate(ctx context.Context, id string) (string, error) {
+	if m.lockClinicForUpdateFn != nil {
+		return m.lockClinicForUpdateFn(ctx, id)
+	}
+	return id, nil
+}
+
+func (m mockQuerier) EndClinicDentistsByClinic(ctx context.Context, clinicID string) (int64, error) {
+	if m.endClinicDentistsByClinicFn != nil {
+		return m.endClinicDentistsByClinicFn(ctx, clinicID)
+	}
+	return 1, nil
+}
+
+func (m mockQuerier) DeleteBankAccountsByClinicID(ctx context.Context, clinicID string) (int64, error) {
+	if m.deleteBankAccountsByClinicFn != nil {
+		return m.deleteBankAccountsByClinicFn(ctx, clinicID)
+	}
+	return 1, nil
+}
+
+func (m mockQuerier) DeleteClinic(ctx context.Context, id string) (int64, error) {
+	if m.deleteClinicFn != nil {
+		return m.deleteClinicFn(ctx, id)
+	}
+	return 1, nil
+}
+
+func (m mockQuerier) DeletePerson(ctx context.Context, id string) (int64, error) {
+	if m.deletePersonFn != nil {
+		return m.deletePersonFn(ctx, id)
+	}
+	return 1, nil
 }
 
 func newAuthServiceForTest(q repository.Querier) *Service {
@@ -69,6 +117,62 @@ func TestUpdateClinicInvalidBankAccountIDToRemove(t *testing.T) {
 	})
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected ErrValidation, got: %v", err)
+	}
+}
+
+func TestDeleteClinicLocksClinicBeforeDeletingBankAccounts(t *testing.T) {
+	clinicID := "019f3329-a5a8-72ec-a95b-6e554247f442"
+	personID := "019f3329-a5a8-72ec-a95b-6e554247f443"
+	calls := make([]string, 0, 6)
+
+	q := mockQuerier{
+		getClinicByIDFn: func(ctx context.Context, id string) (repository.Clinic, error) {
+			calls = append(calls, "GetClinicByID")
+			return repository.Clinic{ID: id, PersonID: personID}, nil
+		},
+		lockClinicForUpdateFn: func(ctx context.Context, id string) (string, error) {
+			calls = append(calls, "LockClinicForUpdate")
+			return id, nil
+		},
+		endClinicDentistsByClinicFn: func(ctx context.Context, id string) (int64, error) {
+			calls = append(calls, "EndClinicDentistsByClinic")
+			return 1, nil
+		},
+		deleteBankAccountsByClinicFn: func(ctx context.Context, id string) (int64, error) {
+			calls = append(calls, "DeleteBankAccountsByClinicID")
+			return 1, nil
+		},
+		deleteClinicFn: func(ctx context.Context, id string) (int64, error) {
+			calls = append(calls, "DeleteClinic")
+			return 1, nil
+		},
+		deletePersonFn: func(ctx context.Context, id string) (int64, error) {
+			calls = append(calls, "DeletePerson")
+			return 1, nil
+		},
+	}
+
+	svc := &Service{}
+	if err := svc.deleteClinicWithinTx(context.Background(), q, clinicID); err != nil {
+		t.Fatalf("delete clinic within tx: %v", err)
+	}
+
+	want := []string{
+		"GetClinicByID",
+		"LockClinicForUpdate",
+		"EndClinicDentistsByClinic",
+		"DeleteBankAccountsByClinicID",
+		"DeleteClinic",
+		"DeletePerson",
+	}
+
+	if len(calls) != len(want) {
+		t.Fatalf("unexpected number of calls: got %d, want %d (%v)", len(calls), len(want), calls)
+	}
+	for i := range want {
+		if calls[i] != want[i] {
+			t.Fatalf("unexpected call order at index %d: got %q, want %q (full calls: %v)", i, calls[i], want[i], calls)
+		}
 	}
 }
 
