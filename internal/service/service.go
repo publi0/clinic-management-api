@@ -22,6 +22,12 @@ const (
 	taxIDTypeCNPJ        = "CNPJ"
 	taxIDTypeCPF         = "CPF"
 	serviceTracerName    = "capim-test/internal/service"
+	maxTaxIDLength       = 32
+	maxLegalNameLength   = 255
+	maxTradeNameLength   = 255
+	maxEmailLength       = 254
+	maxPhoneLength       = 20
+	maxBankFieldLength   = 20
 )
 
 type Service struct {
@@ -74,6 +80,11 @@ func (s *Service) CreateClinic(ctx context.Context, input CreateClinicInput) (Cl
 	}
 	if strings.TrimSpace(input.LegalName) == "" {
 		return ClinicOutput{}, validationError("legal_name is required")
+	}
+	taxIDForValidation := input.TaxIDNumber
+	legalNameForValidation := input.LegalName
+	if err := validateClinicFieldsLength(&taxIDForValidation, &legalNameForValidation, input.TradeName, input.Email, input.Phone); err != nil {
+		return ClinicOutput{}, err
 	}
 	if input.Email != nil && strings.TrimSpace(*input.Email) != "" && !validation.ValidateEmail(*input.Email) {
 		return ClinicOutput{}, validationError("invalid email")
@@ -162,6 +173,9 @@ func (s *Service) UpdateClinic(ctx context.Context, clinicID string, input Updat
 	if input.Email != nil && strings.TrimSpace(*input.Email) != "" && !validation.ValidateEmail(*input.Email) {
 		return ClinicOutput{}, validationError("invalid email")
 	}
+	if err := validateClinicFieldsLength(nil, input.LegalName, input.TradeName, input.Email, input.Phone); err != nil {
+		return ClinicOutput{}, err
+	}
 	if input.BankAccounts != nil {
 		if len(*input.BankAccounts) == 0 {
 			return ClinicOutput{}, validationError("bank_accounts must contain at least one account when provided")
@@ -197,6 +211,15 @@ func (s *Service) UpdateClinic(ctx context.Context, clinicID string, input Updat
 		return ClinicOutput{}, err
 	}
 
+	if input.BankAccounts != nil || input.BankAccountIDsToRemove != nil {
+		if _, err := qtx.LockClinicForUpdate(ctx, clinicID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ClinicOutput{}, notFoundError("clinic not found")
+			}
+			return ClinicOutput{}, mapDatabaseError(err)
+		}
+	}
+
 	if input.LegalName != nil || input.TradeName != nil || input.Email != nil || input.Phone != nil {
 		if _, err := qtx.UpdatePerson(ctx, repository.UpdatePersonParams{
 			ID:        clinic.PersonID,
@@ -227,9 +250,6 @@ func (s *Service) UpdateClinic(ctx context.Context, clinicID string, input Updat
 		}
 	}
 	if input.BankAccountIDsToRemove != nil {
-		if err := lockClinicForUpdate(ctx, tx, clinicID); err != nil {
-			return ClinicOutput{}, err
-		}
 		for _, bankAccountID := range *input.BankAccountIDsToRemove {
 			affected, err := qtx.DeleteBankAccountByIDAndClinicID(ctx, repository.DeleteBankAccountByIDAndClinicIDParams{
 				ID:       strings.TrimSpace(bankAccountID),
@@ -351,6 +371,9 @@ func (s *Service) DeleteClinic(ctx context.Context, clinicID string) error {
 	if _, err := qtx.EndClinicDentistsByClinic(ctx, clinicID); err != nil {
 		return mapDatabaseError(err)
 	}
+	if _, err := qtx.DeleteBankAccountsByClinicID(ctx, clinicID); err != nil {
+		return mapDatabaseError(err)
+	}
 	if _, err := qtx.DeleteClinic(ctx, clinicID); err != nil {
 		return mapDatabaseError(err)
 	}
@@ -374,6 +397,18 @@ func (s *Service) CreateOrAttachDentist(ctx context.Context, clinicID string, in
 	}
 	if strings.TrimSpace(input.LegalName) == "" {
 		return ClinicDentistOutput{}, false, validationError("legal_name is required")
+	}
+	if err := validateMaxLength("tax_id_number", input.TaxIDNumber, maxTaxIDLength); err != nil {
+		return ClinicDentistOutput{}, false, err
+	}
+	if err := validateMaxLength("legal_name", input.LegalName, maxLegalNameLength); err != nil {
+		return ClinicDentistOutput{}, false, err
+	}
+	if err := validateOptionalMaxLength("email", input.Email, maxEmailLength); err != nil {
+		return ClinicDentistOutput{}, false, err
+	}
+	if err := validateOptionalMaxLength("phone", input.Phone, maxPhoneLength); err != nil {
+		return ClinicDentistOutput{}, false, err
 	}
 	if input.Email != nil && strings.TrimSpace(*input.Email) != "" && !validation.ValidateEmail(*input.Email) {
 		return ClinicDentistOutput{}, false, validationError("invalid email")
@@ -674,6 +709,15 @@ func (s *Service) UpdateDentist(ctx context.Context, dentistID string, input Upd
 	if input.Email != nil && strings.TrimSpace(*input.Email) != "" && !validation.ValidateEmail(*input.Email) {
 		return DentistOutput{}, validationError("invalid email")
 	}
+	if err := validateOptionalMaxLength("legal_name", input.LegalName, maxLegalNameLength); err != nil {
+		return DentistOutput{}, err
+	}
+	if err := validateOptionalMaxLength("email", input.Email, maxEmailLength); err != nil {
+		return DentistOutput{}, err
+	}
+	if err := validateOptionalMaxLength("phone", input.Phone, maxPhoneLength); err != nil {
+		return DentistOutput{}, err
+	}
 
 	dentist, err := s.queries.GetDentistByID(ctx, dentistID)
 	if err != nil {
@@ -935,6 +979,48 @@ func validateBankAccountInput(input BankAccountInput) error {
 	if strings.TrimSpace(input.AccountNumber) == "" {
 		return fmt.Errorf("account_number is required")
 	}
+	if len(strings.TrimSpace(input.BankCode)) > maxBankFieldLength {
+		return fmt.Errorf("bank_code must be at most %d characters", maxBankFieldLength)
+	}
+	if len(strings.TrimSpace(input.BranchNumber)) > maxBankFieldLength {
+		return fmt.Errorf("branch_number must be at most %d characters", maxBankFieldLength)
+	}
+	if len(strings.TrimSpace(input.AccountNumber)) > maxBankFieldLength {
+		return fmt.Errorf("account_number must be at most %d characters", maxBankFieldLength)
+	}
+	return nil
+}
+
+func validateClinicFieldsLength(taxID *string, legalName *string, tradeName *string, email *string, phone *string) error {
+	if err := validateOptionalMaxLength("tax_id_number", taxID, maxTaxIDLength); err != nil {
+		return err
+	}
+	if err := validateOptionalMaxLength("legal_name", legalName, maxLegalNameLength); err != nil {
+		return err
+	}
+	if err := validateOptionalMaxLength("trade_name", tradeName, maxTradeNameLength); err != nil {
+		return err
+	}
+	if err := validateOptionalMaxLength("email", email, maxEmailLength); err != nil {
+		return err
+	}
+	if err := validateOptionalMaxLength("phone", phone, maxPhoneLength); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateOptionalMaxLength(field string, value *string, max int) error {
+	if value == nil {
+		return nil
+	}
+	return validateMaxLength(field, *value, max)
+}
+
+func validateMaxLength(field string, value string, max int) error {
+	if len(strings.TrimSpace(value)) > max {
+		return validationError(fmt.Sprintf("%s must be at most %d characters", field, max))
+	}
 	return nil
 }
 
@@ -943,23 +1029,6 @@ func validateBankAccountsInput(accounts []BankAccountInput) error {
 		if err := validateBankAccountInput(account); err != nil {
 			return validationError(fmt.Sprintf("bank_accounts[%d]: %s", idx, err.Error()))
 		}
-	}
-	return nil
-}
-
-func lockClinicForUpdate(ctx context.Context, tx *sql.Tx, clinicID string) error {
-	const lockClinicSQL = `
-SELECT id
-FROM clinics
-WHERE id = $1 AND deleted_at IS NULL
-FOR UPDATE
-`
-	var lockedClinicID string
-	if err := tx.QueryRowContext(ctx, lockClinicSQL, clinicID).Scan(&lockedClinicID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return notFoundError("clinic not found")
-		}
-		return mapDatabaseError(err)
 	}
 	return nil
 }

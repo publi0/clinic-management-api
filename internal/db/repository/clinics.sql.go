@@ -178,3 +178,17 @@ func (q *Queries) ListClinicDetailsCursor(ctx context.Context, arg ListClinicDet
 	}
 	return items, nil
 }
+
+const lockClinicForUpdate = `-- name: LockClinicForUpdate :one
+SELECT id
+FROM clinics
+WHERE id = $1::uuid
+  AND deleted_at IS NULL
+FOR UPDATE
+`
+
+func (q *Queries) LockClinicForUpdate(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRowContext(ctx, lockClinicForUpdate, id)
+	err := row.Scan(&id)
+	return id, err
+}

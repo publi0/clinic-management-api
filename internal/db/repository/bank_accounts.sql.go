@@ -78,6 +78,22 @@ func (q *Queries) DeleteBankAccountByIDAndClinicID(ctx context.Context, arg Dele
 	return result.RowsAffected()
 }
 
+const deleteBankAccountsByClinicID = `-- name: DeleteBankAccountsByClinicID :execrows
+UPDATE bank_accounts
+SET deleted_at = CURRENT_TIMESTAMP,
+    updated_at = CURRENT_TIMESTAMP
+WHERE clinic_id = $1::uuid
+  AND deleted_at IS NULL
+`
+
+func (q *Queries) DeleteBankAccountsByClinicID(ctx context.Context, clinicID string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteBankAccountsByClinicID, clinicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getBankAccountByIDAndClinicID = `-- name: GetBankAccountByIDAndClinicID :one
 SELECT id, clinic_id, bank_code, branch_number, account_number, created_at, updated_at, deleted_at
 FROM bank_accounts
