@@ -36,3 +36,10 @@ SET deleted_at = CURRENT_TIMESTAMP,
 WHERE id = sqlc.arg(id)::uuid
   AND clinic_id = sqlc.arg(clinic_id)::uuid
   AND deleted_at IS NULL;
+
+-- name: DeleteBankAccountsByClinicID :execrows
+UPDATE bank_accounts
+SET deleted_at = CURRENT_TIMESTAMP,
+    updated_at = CURRENT_TIMESTAMP
+WHERE clinic_id = sqlc.arg(clinic_id)::uuid
+  AND deleted_at IS NULL;

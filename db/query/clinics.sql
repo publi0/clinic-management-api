@@ -10,6 +10,13 @@ WHERE id = sqlc.arg(id)::uuid
   AND deleted_at IS NULL
 LIMIT 1;
 
+-- name: LockClinicForUpdate :one
+SELECT id
+FROM clinics
+WHERE id = sqlc.arg(id)::uuid
+  AND deleted_at IS NULL
+FOR UPDATE;
+
 -- name: DeleteClinic :execrows
 UPDATE clinics
 SET deleted_at = CURRENT_TIMESTAMP,

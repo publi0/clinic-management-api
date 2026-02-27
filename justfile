@@ -102,6 +102,22 @@ test-hurl base_url="http://localhost:8080" auth_email="" auth_password="" clinic
 test-hurl-docker:
     just test-hurl http://localhost:8081
 
+test-bruno collection="tests/bruno/clinic-management-api" env="local":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v bru >/dev/null 2>&1; then
+      echo "bru not found. Install from https://www.usebruno.com/downloads"
+      exit 1
+    fi
+    if [ ! -d "{{ collection }}" ]; then
+      echo "Bruno collection directory not found: {{ collection }}"
+      exit 1
+    fi
+    (
+      cd "{{ collection }}"
+      bru run . -r --env "{{ env }}"
+    )
+
 lint:
     gofmt -w $(find . -name '*.go')
     go vet ./...
@@ -122,6 +138,6 @@ migrate-up:
     psql "$database_url" -v ON_ERROR_STOP=1 -f db/schema.sql
 
 repository-generate:
-    sqlc generate -f sqlc.yaml
+    go tool sqlc generate -f sqlc.yaml
 
 dev: migrate-up run

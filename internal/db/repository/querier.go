@@ -17,6 +17,7 @@ type Querier interface {
 	CreatePerson(ctx context.Context, arg CreatePersonParams) (Person, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteBankAccountByIDAndClinicID(ctx context.Context, arg DeleteBankAccountByIDAndClinicIDParams) (int64, error)
+	DeleteBankAccountsByClinicID(ctx context.Context, clinicID string) (int64, error)
 	DeleteClinic(ctx context.Context, id string) (int64, error)
 	DeleteDentist(ctx context.Context, id string) (int64, error)
 	DeletePerson(ctx context.Context, id string) (int64, error)
@@ -37,6 +38,7 @@ type Querier interface {
 	ListDentistsByClinicID(ctx context.Context, clinicID string) ([]ListDentistsByClinicIDRow, error)
 	ListDentistsByClinicIDCursor(ctx context.Context, arg ListDentistsByClinicIDCursorParams) ([]ListDentistsByClinicIDCursorRow, error)
 	ListDentistsByClinicIDs(ctx context.Context, clinicIds []string) ([]ListDentistsByClinicIDsRow, error)
+	LockClinicForUpdate(ctx context.Context, id string) (string, error)
 	UpdateClinicDentistRole(ctx context.Context, arg UpdateClinicDentistRoleParams) (ClinicDentist, error)
 	UpdatePerson(ctx context.Context, arg UpdatePersonParams) (Person, error)
 }
